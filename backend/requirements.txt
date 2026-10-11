@@ -1,0 +1,9 @@
+# Core dependencies, pinned and tested on Python 3.14 (wheels only, no source builds).
+# Django 5.2 is an LTS release supported until April 2028.
+# PostgreSQL driver is optional and lives in requirements-postgres.txt.
+Django==5.2.18
+djangorestframework==3.18.3
+django-cors-headers==4.9.0
+django-environ==0.14.0
+Pillow==12.3.0
+qrcode==8.2

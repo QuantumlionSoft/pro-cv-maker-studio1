@@ -1,0 +1,56 @@
+/* Print / PDF output for the CV builder. Only the A4 document is printed. */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Everything except the CV document is hidden: toolbars, forms, toasts, dialogs. */
+  .cv-no-print,
+  .toast-host,
+  .confirm-backdrop,
+  .confirm-dialog {
+    display: none !important;
+  }
+
+  .cv-builder,
+  .cv-workspace,
+  .cv-preview-col {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: #fff !important;
+    width: auto !important;
+  }
+
+  /* Mobile view toggles hide columns on narrow screens. Print pages are narrow too, so force the document visible. */
+  .cv-builder .cv-preview-col.cv-hide-sm,
+  .cv-builder .cv-form-col.cv-hide-sm {
+    display: none !important;
+  }
+  .cv-builder .cv-preview-col.cv-hide-sm {
+    display: block !important;
+  }
+
+  .cv-document {
+    margin: 0 !important;
+    box-shadow: none !important;
+    zoom: 1 !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
