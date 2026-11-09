@@ -13,6 +13,8 @@ export const SECTION_TABS = [
   { id: 'projects', label: 'Projeler', icon: 'bi-kanban' },
   { id: 'certifications', label: 'Sertifikalar', icon: 'bi-patch-check' },
   { id: 'references', label: 'Referanslar', icon: 'bi-people' },
+  { id: 'layout', label: 'Bölüm Düzeni', icon: 'bi-layout-three-columns' },
+  { id: 'analysis', label: 'CV Analizi', icon: 'bi-clipboard2-check' },
   { id: 'design', label: 'Tasarım Ayarları', icon: 'bi-palette' },
 ]
 
@@ -26,8 +28,9 @@ export const LIST_SECTIONS = {
       { key: 'position', label: 'Pozisyon', kind: 'text', placeholder: 'Pozisyon / Ünvan' },
       { key: 'location', label: 'Konum', kind: 'text', placeholder: 'Şehir' },
       { key: 'start', label: 'Başlangıç', kind: 'text', placeholder: 'Örn: 03.2024', half: true },
-      { key: 'end', label: 'Bitiş', kind: 'text', placeholder: 'Örn: Halen', half: true },
-      { key: 'description', label: 'Açıklama', kind: 'textarea', placeholder: 'Neler yaptınız?', rows: 3 },
+      { key: 'end', label: 'Bitiş', kind: 'text', placeholder: 'Örn: 08.2026', half: true },
+      { key: 'current', label: 'Halen bu pozisyonda çalışıyorum', kind: 'switch' },
+      { key: 'description', label: 'Açıklama', kind: 'textarea', placeholder: 'Sorumluluklarınızı ve ölçülebilir başarılarınızı yazın…', rows: 3 },
       { key: 'logoId', label: 'Logo', kind: 'image', purpose: 'logo' },
     ],
   },

@@ -16,6 +16,11 @@ export function createDocumentApi(kind) {
     update: (id, payload) => apiRequest('PATCH', `${base}/${id}/`, { body: payload }),
     duplicate: (id) => apiRequest('POST', `${base}/${id}/duplicate/`),
     remove: (id) => apiRequest('DELETE', `${base}/${id}/`),
+    trash: () => apiRequest('GET', `${base}/trash/`),
+    restore: (id) => apiRequest('POST', `${base}/${id}/restore/`),
+    permanentRemove: (id) => apiRequest('DELETE', `${base}/${id}/permanent/`),
+    revisions: (id) => apiRequest('GET', `${base}/${id}/revisions/`),
+    restoreRevision: (id, revisionId) => apiRequest('POST', `${base}/${id}/restore-revision/`, { body: { revision_id: revisionId } }),
     templates: () => apiRequest('GET', templates),
   }
 }

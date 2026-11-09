@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 
 from rest_framework.exceptions import ValidationError
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+CV_SECTIONS = ["summary", "experience", "education", "skills", "languages", "technologies", "projects", "certifications", "references"]
 MAX_ITEMS = 40
 MAX_LONG_TEXT = 4000
 MAX_TEXT = 1000
@@ -44,6 +45,9 @@ def default_design():
 def empty_content():
     return {
         "schemaVersion": SCHEMA_VERSION,
+        "sectionOrder": CV_SECTIONS.copy(),
+        "hiddenSections": [],
+        "sectionTitles": {},
         "personal": {
             "firstName": "",
             "middleName": "",
@@ -247,6 +251,30 @@ def _reference(raw, path, owned):
     }
 
 
+def _section_layout(raw):
+    order_raw = raw.get("sectionOrder")
+    order = []
+    if isinstance(order_raw, list):
+        for key in order_raw:
+            if key in CV_SECTIONS and key not in order:
+                order.append(key)
+    order.extend(key for key in CV_SECTIONS if key not in order)
+
+    hidden_raw = raw.get("hiddenSections")
+    hidden = []
+    if isinstance(hidden_raw, list):
+        hidden = [key for key in hidden_raw if key in CV_SECTIONS and key not in hidden]
+
+    titles_raw = raw.get("sectionTitles")
+    titles = {}
+    if isinstance(titles_raw, dict):
+        for key in CV_SECTIONS:
+            value = titles_raw.get(key)
+            if isinstance(value, str) and value.strip():
+                titles[key] = _text(value, f"sectionTitles.{key}", 60)
+    return order, hidden, titles
+
+
 def normalize_content(raw, owned):
     """Return a clean copy of CV content. `owned(media_id) -> bool` checks ownership."""
     if raw is None:
@@ -256,8 +284,12 @@ def normalize_content(raw, owned):
     personal_raw = raw.get("personal") or {}
     if not isinstance(personal_raw, dict):
         raise _err("personal", "must be an object.")
+    section_order, hidden_sections, section_titles = _section_layout(raw)
     return {
         "schemaVersion": SCHEMA_VERSION,
+        "sectionOrder": section_order,
+        "hiddenSections": hidden_sections,
+        "sectionTitles": section_titles,
         "personal": _personal(personal_raw, owned),
         "summary": _text(raw.get("summary"), "summary", MAX_LONG_TEXT),
         "experience": _items(raw.get("experience"), "experience", _experience, owned),

@@ -23,12 +23,19 @@ export function useCvBuilder({ id, api = cvApi, scheduleDelay = AUTOSAVE_DELAY_M
   const template = ref('modern')
   const content = ref(null)
   const design = ref(null)
+  const documentVersion = ref(1)
 
   let version = 1
   let savedSnapshot = ''
   let timer = null
   let inFlight = false
   let pending = false
+  const undoStack = ref([])
+  const redoStack = ref([])
+  let historyTimer = null
+  let historyReady = false
+  let historySnapshot = ''
+  let applyingHistory = false
 
   const snapshot = () =>
     JSON.stringify({ title: title.value, template: template.value, content: content.value, design: design.value })
@@ -36,11 +43,13 @@ export function useCvBuilder({ id, api = cvApi, scheduleDelay = AUTOSAVE_DELAY_M
   const hasUnsaved = computed(() => ['dirty', 'saving', 'error'].includes(status.value))
 
   function applyServerDocument(doc) {
+    resetHistory()
     title.value = doc.title
     template.value = doc.template
     content.value = structuredClone(doc.content)
     design.value = structuredClone(doc.design)
     version = doc.version
+    documentVersion.value = doc.version
     savedSnapshot = snapshot()
   }
 
@@ -65,6 +74,7 @@ export function useCvBuilder({ id, api = cvApi, scheduleDelay = AUTOSAVE_DELAY_M
     try {
       const updated = await api.update(id, { ...JSON.parse(current), version })
       version = updated.version
+      documentVersion.value = updated.version
       savedSnapshot = current
       lastSavedAt.value = new Date()
       status.value = snapshot() === current ? 'saved' : 'dirty'
@@ -123,10 +133,64 @@ export function useCvBuilder({ id, api = cvApi, scheduleDelay = AUTOSAVE_DELAY_M
     }
   }
 
-  /** Replace content and design (JSON import). Autosave will persist it. */
-  function replaceFromImport({ content: newContent, design: newDesign }) {
+  /** Replace content, design and optional template (JSON import). Autosave persists it. */
+  function replaceFromImport({ content: newContent, design: newDesign, template: newTemplate }) {
     content.value = newContent
     design.value = { ...design.value, ...newDesign }
+    if (typeof newTemplate === 'string' && newTemplate) template.value = newTemplate
+  }
+
+  function resetHistory() {
+    clearTimeout(historyTimer)
+    undoStack.value = []
+    redoStack.value = []
+    historyReady = false
+    historySnapshot = ''
+    applyingHistory = false
+  }
+
+  watch(snapshot, (current) => {
+    if (!historyReady) {
+      historySnapshot = current
+      historyReady = true
+      return
+    }
+    if (applyingHistory) {
+      historySnapshot = current
+      applyingHistory = false
+      return
+    }
+    clearTimeout(historyTimer)
+    historyTimer = setTimeout(() => {
+      if (current === historySnapshot) return
+      undoStack.value.push(historySnapshot)
+      if (undoStack.value.length > 50) undoStack.value.shift()
+      redoStack.value = []
+      historySnapshot = current
+    }, 400)
+  })
+
+  function applyHistorySnapshot(value) {
+    const data = JSON.parse(value)
+    applyingHistory = true
+    title.value = data.title
+    template.value = data.template
+    content.value = structuredClone(data.content)
+    design.value = structuredClone(data.design)
+  }
+
+  function undo() {
+    clearTimeout(historyTimer)
+    if (!undoStack.value.length) return
+    redoStack.value.push(snapshot())
+    applyHistorySnapshot(undoStack.value.pop())
+  }
+
+  function redo() {
+    clearTimeout(historyTimer)
+    if (!redoStack.value.length) return
+    undoStack.value.push(snapshot())
+    applyHistorySnapshot(redoStack.value.pop())
   }
 
   return {
@@ -138,6 +202,11 @@ export function useCvBuilder({ id, api = cvApi, scheduleDelay = AUTOSAVE_DELAY_M
     content,
     design,
     hasUnsaved,
+    version: documentVersion,
+    canUndo: computed(() => undoStack.value.length > 0),
+    canRedo: computed(() => redoStack.value.length > 0),
+    undo,
+    redo,
     load,
     save,
     retry: save,

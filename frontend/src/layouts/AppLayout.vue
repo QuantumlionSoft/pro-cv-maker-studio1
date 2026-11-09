@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -12,6 +12,7 @@ const ui = useUiStore()
 const SIDEBAR_KEY = 'pcms:sidebar'
 const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_KEY) === 'collapsed')
 const mobileNavOpen = ref(false)
+const initials = computed(() => String(auth.displayName || 'K').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase())
 watch(sidebarCollapsed, (value) => localStorage.setItem(SIDEBAR_KEY, value ? 'collapsed' : 'expanded'))
 watch(() => route.fullPath, () => {
   mobileNavOpen.value = false
@@ -20,28 +21,28 @@ watch(() => route.fullPath, () => {
 // Items with `slug` link to a "coming soon" page that explains the delivery phase.
 const navGroups = [
   {
-    label: 'Workspace',
+    label: 'Çalışma alanı',
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
-      { to: '/cvs', label: 'My CVs', icon: 'bi-file-earmark-person' },
-      { to: '/portfolios', label: 'My Portfolios', icon: 'bi-window-sidebar' },
+      { to: '/dashboard', label: 'Genel Bakış', icon: 'bi-grid-1x2' },
+      { to: '/cvs', label: 'CV’lerim', icon: 'bi-file-earmark-person' },
+      { to: '/portfolios', label: 'Portfolyolarım', icon: 'bi-window-sidebar' },
     ],
   },
   {
-    label: 'Library',
+    label: 'Kütüphane',
     items: [
-      { slug: 'projects', label: 'Projects', icon: 'bi-kanban', phase: 3 },
-      { slug: 'certificates', label: 'Certificates', icon: 'bi-award', phase: 3 },
-      { to: '/templates', label: 'Templates', icon: 'bi-palette' },
-      { slug: 'qr-codes', label: 'QR Codes', icon: 'bi-qr-code', phase: 3 },
-      { slug: 'media', label: 'Media Library', icon: 'bi-images', phase: 3 },
+      { slug: 'projects', label: 'Projeler', icon: 'bi-kanban', phase: 3 },
+      { slug: 'certificates', label: 'Sertifikalar', icon: 'bi-award', phase: 3 },
+      { to: '/templates', label: 'Şablon Galerisi', icon: 'bi-palette' },
+      { slug: 'qr-codes', label: 'QR Kodları', icon: 'bi-qr-code', phase: 3 },
+      { slug: 'media', label: 'Medya Kütüphanesi', icon: 'bi-images', phase: 3 },
     ],
   },
   {
-    label: 'Account',
+    label: 'Hesap',
     items: [
-      { slug: 'exports', label: 'Exports', icon: 'bi-download', phase: 5 },
-      { to: '/account', label: 'Account Settings', icon: 'bi-person-gear' },
+      { slug: 'exports', label: 'Dışa Aktarımlar', icon: 'bi-download', phase: 5 },
+      { to: '/account', label: 'Hesap Ayarları', icon: 'bi-person-gear' },
     ],
   },
 ]
@@ -62,22 +63,22 @@ async function signOut() {
   try {
     await auth.logout()
   } catch (error) {
-    ui.toast(error.message || 'Sign-out failed. Please try again.', 'danger')
+    ui.toast(error.message || 'Çıkış yapılamadı. Lütfen tekrar deneyin.', 'danger')
     return
   }
-  ui.toast('You have signed out.', 'info')
+  ui.toast('Güvenli şekilde çıkış yaptınız.', 'info')
   router.push({ name: 'login' })
 }
 </script>
 
 <template>
   <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'mobile-nav-open': mobileNavOpen }">
-    <a href="#main-content" class="skip-link">Skip to content</a>
+    <a href="#main-content" class="skip-link">İçeriğe geç</a>
 
-    <aside class="app-sidebar" aria-label="Main navigation">
+    <aside class="app-sidebar" aria-label="Ana menü">
       <RouterLink :to="{ name: 'dashboard' }" class="brand-link brand-link--sidebar">
         <span class="brand-mark" aria-hidden="true"><i class="bi bi-file-earmark-richtext"></i></span>
-        <span class="brand-name">Pro CV Maker Studio</span>
+        <span class="brand-name"><strong>Pro CV</strong><small>MAKER STUDIO</small></span>
       </RouterLink>
 
       <nav class="sidebar-nav">
@@ -98,10 +99,15 @@ async function signOut() {
         </div>
       </nav>
 
+      <RouterLink to="/templates" class="sidebar-promo">
+        <span class="sidebar-promo-icon"><i class="bi bi-stars"></i></span>
+        <span><strong>10 profesyonel şablon</strong><small>Yeni görünümleri keşfedin <i class="bi bi-arrow-right"></i></small></span>
+      </RouterLink>
+
       <div class="sidebar-footer">
         <button type="button" class="nav-link nav-toggle" :aria-expanded="!sidebarCollapsed" @click="toggleNav">
           <i :class="['bi', sidebarCollapsed ? 'bi-layout-sidebar' : 'bi-layout-sidebar-inset']" aria-hidden="true"></i>
-          <span class="nav-label">{{ sidebarCollapsed ? 'Expand' : 'Collapse' }} sidebar</span>
+          <span class="nav-label">Menüyü {{ sidebarCollapsed ? 'genişlet' : 'daralt' }}</span>
         </button>
       </div>
     </aside>
@@ -110,14 +116,14 @@ async function signOut() {
 
     <div class="app-main">
       <header class="app-topbar">
-        <button type="button" class="btn btn-light btn-icon" aria-label="Toggle navigation" @click="toggleNav">
+        <button type="button" class="btn btn-light btn-icon" aria-label="Menüyü aç veya kapat" @click="toggleNav">
           <i class="bi bi-list" aria-hidden="true"></i>
         </button>
-        <h1 class="topbar-title">{{ route.meta.title }}</h1>
-        <div class="ms-auto d-flex align-items-center gap-2">
-          <span class="topbar-user d-none d-md-inline">{{ auth.displayName }}</span>
-          <button type="button" class="btn btn-outline-secondary btn-sm" @click="signOut">
-            <i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>Sign out
+        <div class="topbar-heading"><h1 class="topbar-title">{{ route.meta.title }}</h1><span class="topbar-breadcrumb">Çalışma alanı <i class="bi bi-chevron-right"></i> {{ route.meta.title }}</span></div>
+        <div class="ms-auto d-flex align-items-center gap-2 gap-md-3">
+          <span class="topbar-user d-none d-md-flex"><span class="topbar-avatar">{{ initials }}</span><span><strong>{{ auth.displayName }}</strong><small>Kişisel hesap</small></span></span>
+          <button type="button" class="btn btn-outline-secondary btn-sm topbar-signout" title="Çıkış yap" @click="signOut">
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="d-none d-lg-inline ms-1">Çıkış yap</span>
           </button>
         </div>
       </header>

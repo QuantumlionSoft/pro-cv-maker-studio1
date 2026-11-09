@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { blankItem } from '@/utils/cvContent'
 import ImageField from './ImageField.vue'
 
@@ -16,6 +17,22 @@ function add() {
 function remove(index) {
   props.items.splice(index, 1)
 }
+
+const draggedIndex = ref(null)
+const dragOverIndex = ref(null)
+function move(index, direction) {
+  const target = index + direction
+  if (target < 0 || target >= props.items.length) return
+  const [item] = props.items.splice(index, 1)
+  props.items.splice(target, 0, item)
+}
+function drop(index) {
+  if (draggedIndex.value === null || draggedIndex.value === index) return
+  const [item] = props.items.splice(draggedIndex.value, 1)
+  props.items.splice(index, 0, item)
+  draggedIndex.value = null
+  dragOverIndex.value = null
+}
 </script>
 
 <template>
@@ -31,7 +48,15 @@ function remove(index) {
 
     <!-- Compact rows: skills, languages, technologies -->
     <template v-if="config.compact">
-      <div v-for="(item, index) in items" :key="item.id" class="cv-compact-row d-flex align-items-center gap-2 mb-2 p-2 rounded bg-light">
+      <div
+        v-for="(item, index) in items"
+        :key="item.id"
+        class="cv-compact-row d-flex align-items-center gap-2 mb-2 p-2 rounded bg-light"
+        :class="{ 'is-drag-over': dragOverIndex === index }"
+        @dragover.prevent="dragOverIndex = index"
+        @drop.prevent="drop(index)"
+      >
+        <button type="button" class="item-drag" title="Sürükleyerek sırala" draggable="true" @dragstart="draggedIndex = index" @dragend="draggedIndex = null; dragOverIndex = null"><i class="bi bi-grip-vertical"></i></button>
         <input
           v-model="item.name"
           type="text"
@@ -52,6 +77,7 @@ function remove(index) {
           >
           <span class="small text-secondary cv-level">{{ item.level }}%</span>
         </template>
+        <span class="item-order-buttons"><button type="button" :disabled="index === 0" aria-label="Yukarı taşı" @click="move(index, -1)"><i class="bi bi-chevron-up"></i></button><button type="button" :disabled="index === items.length - 1" aria-label="Aşağı taşı" @click="move(index, 1)"><i class="bi bi-chevron-down"></i></button></span>
         <button type="button" class="btn btn-sm text-danger flex-shrink-0" :aria-label="`${config.title} ${index + 1} sil`" @click="remove(index)">
           <i class="bi bi-x-circle-fill"></i>
         </button>
@@ -60,10 +86,21 @@ function remove(index) {
 
     <!-- Cards: experience, education, projects, certifications, references -->
     <template v-else>
-      <div v-for="(item, index) in items" :key="item.id" class="card mb-3 shadow-sm border-0 bg-light">
+      <div
+        v-for="(item, index) in items"
+        :key="item.id"
+        class="card mb-3 shadow-sm border-0 bg-light cv-sortable-card"
+        :class="{ 'is-drag-over': dragOverIndex === index }"
+        @dragover.prevent="dragOverIndex = index"
+        @drop.prevent="drop(index)"
+      >
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="fw-bold text-primary mb-0">{{ config.itemLabel }} {{ index + 1 }}</h6>
+            <div class="d-flex align-items-center gap-1 min-w-0">
+              <button type="button" class="item-drag" title="Sürükleyerek sırala" draggable="true" @dragstart="draggedIndex = index" @dragend="draggedIndex = null; dragOverIndex = null"><i class="bi bi-grip-vertical"></i></button>
+              <h6 class="fw-bold text-primary mb-0">{{ config.itemLabel }} {{ index + 1 }}</h6>
+              <span class="item-order-buttons"><button type="button" :disabled="index === 0" aria-label="Yukarı taşı" @click="move(index, -1)"><i class="bi bi-chevron-up"></i></button><button type="button" :disabled="index === items.length - 1" aria-label="Aşağı taşı" @click="move(index, 1)"><i class="bi bi-chevron-down"></i></button></span>
+            </div>
             <button type="button" class="btn btn-sm btn-link text-danger p-0" @click="remove(index)">
               <i class="bi bi-trash"></i> Sil
             </button>
@@ -105,6 +142,7 @@ function remove(index) {
                     :type="field.kind === 'email' ? 'email' : 'text'"
                     class="form-control form-control-sm"
                     :placeholder="field.placeholder"
+                    :disabled="field.key === 'end' && item.current"
                     maxlength="1000"
                   >
                 </template>
@@ -119,4 +157,10 @@ function remove(index) {
 
 <style scoped>
 .cv-level { min-width: 2.75rem; text-align: right; }
+.item-drag { padding: .2rem 0; color: #98a2b3; border: 0; background: transparent; cursor: grab; }
+.item-order-buttons { display: inline-flex; }
+.item-order-buttons button { width: 24px; height: 25px; padding: 0; color: #8792a5; border: 0; background: transparent; font-size: .68rem; }
+.item-order-buttons button:disabled { opacity: .25; }
+.is-drag-over { outline: 2px solid var(--pcms-brand); outline-offset: 2px; }
+.cv-sortable-card { transition: outline-color .15s; }
 </style>

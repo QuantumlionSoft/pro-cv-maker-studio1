@@ -21,6 +21,12 @@ export const DESIGN_DEFAULTS = {
   newPageForExtras: true,
 }
 
+export const CV_SECTION_ORDER = ['summary', 'experience', 'education', 'skills', 'languages', 'technologies', 'projects', 'certifications', 'references']
+export const DEFAULT_SECTION_TITLES = {
+  summary: 'Profil', experience: 'Deneyim', education: 'Eğitim', skills: 'Yetenekler', languages: 'Diller',
+  technologies: 'Teknolojiler', projects: 'Projeler', certifications: 'Sertifikalar', references: 'Referanslar',
+}
+
 export const EXPORT_FORMAT = 'pro-cv-maker-studio'
 
 let seq = 0
@@ -91,6 +97,9 @@ export function convertPrototypeContent(data) {
   if (logos.length) warnings.push('Prototip logoları içe aktarılamadı; logoları yeniden yükleyin.')
 
   const content = {
+    sectionOrder: [...CV_SECTION_ORDER],
+    hiddenSections: [],
+    sectionTitles: {},
     personal: {
       ...splitName(p.name),
       title: text(p.title),
@@ -168,7 +177,7 @@ export function parseImport(jsonText) {
   const isPrototype = 'name' in source.personal && !('firstName' in source.personal)
   if (isPrototype) {
     const { content, warnings } = convertPrototypeContent(source)
-    return { content, design: pickDesign(root.design), warnings }
+    return { content, design: pickDesign(root.design), template: text(root.template) || undefined, warnings }
   }
 
   // Our own format: ids are regenerated so that imported duplicates cannot collide.
@@ -184,7 +193,7 @@ export function parseImport(jsonText) {
   const warnings = []
   const hadImages = source.personal.photoId || [...(source.experience || []), ...(source.education || [])].some((i) => i && i.logoId)
   if (hadImages) warnings.push('Fotoğraflar JSON dosyasına dahil değildir; yeniden yükleyin.')
-  return { content, design: pickDesign(root.design), warnings }
+  return { content, design: pickDesign(root.design), template: text(root.template) || undefined, warnings }
 }
 
 /** Export: photo/logo references are omitted because they point at this account's private files. */

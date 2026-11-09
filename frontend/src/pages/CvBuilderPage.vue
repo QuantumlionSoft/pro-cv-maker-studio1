@@ -3,12 +3,15 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute } from 'vue-router'
 import CvFormPanel from '@/components/cv/CvFormPanel.vue'
 import CvPreview from '@/components/cv/CvPreview.vue'
+import CvHistoryDrawer from '@/components/cv/CvHistoryDrawer.vue'
 import { SECTION_TABS } from '@/components/cv/cvSections'
 import SaveStatus from '@/components/common/SaveStatus.vue'
 import { useCvBuilder } from '@/composables/useCvBuilder'
 import { cvApi } from '@/services/documents'
+import { mediaApi } from '@/services/media'
 import { useUiStore } from '@/stores/ui'
-import { buildExport, parseImport } from '@/utils/cvContent'
+import { buildExport } from '@/utils/cvContent'
+import { createCvBackup, parseDocumentFile } from '@/utils/cvImport'
 import '@/assets/css/cv-print.css'
 
 const route = useRoute()
@@ -23,6 +26,10 @@ const docShell = ref(null)
 const previewCol = ref(null)
 const zoom = ref(1)
 const importInput = ref(null)
+const historyOpen = ref(false)
+const importing = ref(false)
+const backupBusy = ref(false)
+const isPrinting = ref(false)
 const DOC_WIDTH_PX = 794 // 210mm at 96dpi
 
 const isReady = computed(() => content.value !== null)
@@ -50,7 +57,18 @@ function updateZoom() {
   zoom.value = Math.min(1, Math.max(0.35, available / DOC_WIDTH_PX))
 }
 
-/* ---------- JSON import / export ---------- */
+/* ---------- JSON / ZIP / Office import and portable export ---------- */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 function exportJson() {
   try {
     const data = buildExport({
@@ -60,17 +78,24 @@ function exportJson() {
       design: design.value,
     })
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${slug(title.value) || 'cv'}-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    downloadBlob(blob, `${slug(title.value) || 'cv'}-${new Date().toISOString().slice(0, 10)}.json`)
     ui.toast('JSON dosyası indirildi. Fotoğraflar dosyaya dahil edilmez.', 'success')
   } catch {
     ui.toast('JSON dışa aktarılamadı.', 'danger')
+  }
+}
+
+async function exportBackup() {
+  backupBusy.value = true
+  try {
+    const result = await createCvBackup({ title: title.value, template: template.value, content: content.value, design: design.value })
+    downloadBlob(result.blob, `${slug(title.value) || 'cv'}-yedek-${new Date().toISOString().slice(0, 10)}.zip`)
+    result.warnings.forEach((message) => ui.toast(message, 'warning', 8000))
+    ui.toast(`Yedek indirildi. ${result.imageCount} görsel pakete eklendi.`, 'success')
+  } catch (error) {
+    ui.toast(error.message || 'ZIP yedeği oluşturulamadı.', 'danger')
+  } finally {
+    backupBusy.value = false
   }
 }
 
@@ -91,24 +116,42 @@ async function onImportFile(event) {
   const file = event.target.files && event.target.files[0]
   event.target.value = ''
   if (!file) return
+  importing.value = true
   let parsed
   try {
-    parsed = parseImport(await file.text())
+    parsed = await parseDocumentFile(file)
   } catch (error) {
-    ui.toast(error.message || 'Geçersiz JSON dosyası.', 'danger')
+    ui.toast(error.message || 'Dosya içe aktarılamadı.', 'danger', 0)
+    importing.value = false
     return
   }
   const ok = await ui.confirm({
-    title: 'JSON içe aktarılsın mı?',
-    message: 'Mevcut içerik ve tasarım bu dosyadaki verilerle değiştirilecek.',
+    title: 'Dosya içe aktarılsın mı?',
+    message: 'Mevcut içerik ve tasarım dosyadaki verilerle değiştirilecek. Ayrıştırılan alanları daha sonra kontrol edebilirsiniz.',
     confirmText: 'İçe aktar',
     cancelText: 'Vazgeç',
     danger: true,
   })
-  if (!ok) return
-  builder.replaceFromImport(parsed)
-  parsed.warnings.forEach((message) => ui.toast(message, 'warning', 8000))
-  ui.toast('Veriler içe aktarıldı ve kaydediliyor.', 'success')
+  if (!ok) { importing.value = false; return }
+  try {
+    for (const image of parsed.media || []) {
+      try {
+        const filename = image.path.split('/').pop()
+        const asset = await mediaApi.upload(new File([image.blob], filename, { type: image.type || image.blob.type }), image.purpose)
+        if (parsed.content.personal.photoId === image.originalId) parsed.content.personal.photoId = asset.id
+        for (const section of ['experience', 'education']) {
+          for (const item of parsed.content[section] || []) if (item.logoId === image.originalId) item.logoId = asset.id
+        }
+      } catch {
+        parsed.warnings.push(`${image.path} geri yüklenemedi; görseli yeniden seçin.`)
+      }
+    }
+    builder.replaceFromImport(parsed)
+    parsed.warnings.forEach((message) => ui.toast(message, 'warning', 8000))
+    ui.toast('Veriler içe aktarıldı ve kaydediliyor.', 'success')
+  } finally {
+    importing.value = false
+  }
 }
 
 /* ---------- Print / PDF ---------- */
@@ -126,9 +169,23 @@ function waitForImages(root) {
   )
 }
 
+let titleBeforePrint = ''
+let printFallback = null
+function afterPrint() {
+  isPrinting.value = false
+  clearTimeout(printFallback)
+  if (titleBeforePrint) document.title = titleBeforePrint
+}
+
 async function printCv() {
+  if (isPrinting.value) return
+  isPrinting.value = true
   await nextTick()
-  await waitForImages(docShell.value)
+  await Promise.all([waitForImages(docShell.value), document.fonts?.ready])
+  titleBeforePrint = document.title
+  document.title = `${slug(title.value) || 'cv'}.pdf`
+  ui.toast('Yazdırma penceresinde “PDF olarak kaydet” ve “Arka plan grafikleri” seçeneklerini kullanabilirsiniz.', 'info', 7000)
+  printFallback = setTimeout(afterPrint, 60000)
   window.print()
 }
 
@@ -146,9 +203,15 @@ async function reloadServerCopy() {
 
 /* ---------- Keyboard, unload guard, route guard ---------- */
 function onKeydown(event) {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+  if (!(event.ctrlKey || event.metaKey)) return
+  const key = event.key.toLowerCase()
+  if (key === 's') { event.preventDefault(); builder.save() }
+  if (key === 'p') { event.preventDefault(); printCv() }
+  const editingText = ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName) || event.target?.isContentEditable
+  if (!editingText && (key === 'z' || key === 'y')) {
     event.preventDefault()
-    builder.save()
+    if (key === 'y' || event.shiftKey) builder.redo()
+    else builder.undo()
   }
 }
 function onBeforeUnload(event) {
@@ -183,12 +246,15 @@ watch(previewCol, (el) => {
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener('afterprint', afterPrint)
   await Promise.all([builder.load(), loadTemplates()])
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('afterprint', afterPrint)
+  clearTimeout(printFallback)
   resizeObserver?.disconnect()
 })
 
@@ -225,11 +291,12 @@ watch(title, (value) => {
     <template v-else>
       <header class="cv-topbar cv-no-print">
         <div class="d-flex align-items-center gap-2 gap-md-3 flex-grow-1 min-w-0">
-          <RouterLink to="/cvs" class="btn btn-sm btn-outline-light flex-shrink-0" aria-label="CV listesine dön">
+          <RouterLink to="/cvs" class="btn btn-sm btn-outline-secondary flex-shrink-0" aria-label="CV listesine dön">
             <i class="bi bi-arrow-left"></i>
           </RouterLink>
           <i class="bi bi-file-earmark-person fs-4 text-primary d-none d-md-inline"></i>
           <input
+            id="editor-title"
             v-model="title"
             class="form-control form-control-sm cv-title-input"
             aria-label="CV başlığı"
@@ -250,18 +317,29 @@ watch(title, (value) => {
           >
             <i class="bi bi-arrow-clockwise me-1"></i>Sunucu sürümünü yükle
           </button>
-          <button type="button" class="btn btn-sm btn-outline-light" title="JSON olarak indir" @click="exportJson">
-            <i class="bi bi-download me-1"></i><span class="d-none d-lg-inline">JSON İndir</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" title="Değişiklikleri şimdi kaydet (Ctrl+S)" :disabled="status === 'saving'" @click="builder.save">
+            <i class="bi bi-check2 me-1"></i><span class="d-none d-lg-inline">Kaydet</span>
           </button>
-          <button type="button" class="btn btn-sm btn-outline-light" title="JSON dosyasından yükle" @click="pickImportFile">
-            <i class="bi bi-upload me-1"></i><span class="d-none d-lg-inline">JSON Yükle</span>
-          </button>
-          <input ref="importInput" type="file" accept="application/json,.json" class="visually-hidden" @change="onImportFile">
-          <button type="button" class="btn btn-sm btn-primary fw-bold px-3" title="Yazdır veya PDF olarak kaydet" @click="printCv">
-            <i class="bi bi-printer-fill me-1"></i>PDF / Yazdır
+          <button type="button" class="btn btn-sm btn-primary fw-bold px-3" title="Yazdır veya PDF olarak kaydet (Ctrl+P)" :disabled="isPrinting" @click="printCv">
+            <span v-if="isPrinting" class="spinner-border spinner-border-sm me-1"></span><i v-else class="bi bi-printer-fill me-1"></i>{{ isPrinting ? 'Hazırlanıyor…' : 'PDF / Yazdır' }}
           </button>
         </div>
       </header>
+
+      <div class="cv-actionbar cv-no-print">
+        <div class="cv-action-group">
+          <button type="button" class="btn btn-sm btn-light" title="Geri al (Ctrl+Z)" :disabled="!builder.canUndo.value" @click="builder.undo"><i class="bi bi-arrow-counterclockwise"></i><span>Geri al</span></button>
+          <button type="button" class="btn btn-sm btn-light" title="Yinele (Ctrl+Shift+Z)" :disabled="!builder.canRedo.value" @click="builder.redo"><i class="bi bi-arrow-clockwise"></i><span>Yinele</span></button>
+          <span class="cv-action-divider"></span>
+          <button type="button" class="btn btn-sm btn-light" @click="historyOpen = true"><i class="bi bi-clock-history"></i><span>Sürüm geçmişi</span></button>
+        </div>
+        <div class="cv-action-group">
+          <button type="button" class="btn btn-sm btn-light" title="Görsel içermeyen JSON indir" @click="exportJson"><i class="bi bi-filetype-json"></i><span>JSON indir</span></button>
+          <button type="button" class="btn btn-sm btn-light" title="Fotoğraf ve logolarla tam ZIP yedeği" :disabled="backupBusy" @click="exportBackup"><span v-if="backupBusy" class="spinner-border spinner-border-sm"></span><i v-else class="bi bi-file-earmark-zip"></i><span>{{ backupBusy ? 'Hazırlanıyor…' : 'Tam yedek' }}</span></button>
+          <button type="button" class="btn btn-sm btn-outline-primary" title="JSON, ZIP, PDF, DOCX veya TXT yükle" :disabled="importing" @click="pickImportFile"><span v-if="importing" class="spinner-border spinner-border-sm"></span><i v-else class="bi bi-upload"></i><span>{{ importing ? 'İçe aktarılıyor…' : 'Dosya yükle' }}</span></button>
+          <input ref="importInput" type="file" accept=".json,.zip,.pdf,.docx,.txt,application/json,application/pdf" class="visually-hidden" @change="onImportFile">
+        </div>
+      </div>
 
       <!-- Save status for small screens -->
       <div class="cv-save-bar cv-no-print d-xl-none">
@@ -270,10 +348,10 @@ watch(title, (value) => {
 
       <!-- Mobile view switch -->
       <div class="cv-mobile-switch cv-no-print btn-group btn-group-sm d-lg-none" role="group" aria-label="Görünüm">
-        <button type="button" class="btn" :class="mobileView === 'form' ? 'btn-primary' : 'btn-outline-light'" @click="mobileView = 'form'">
+        <button type="button" class="btn" :class="mobileView === 'form' ? 'btn-primary' : 'btn-outline-secondary'" @click="mobileView = 'form'">
           <i class="bi bi-pencil-square me-1"></i>Düzenle
         </button>
-        <button type="button" class="btn" :class="mobileView === 'preview' ? 'btn-primary' : 'btn-outline-light'" @click="mobileView = 'preview'">
+        <button type="button" class="btn" :class="mobileView === 'preview' ? 'btn-primary' : 'btn-outline-secondary'" @click="mobileView = 'preview'">
           <i class="bi bi-eye me-1"></i>Önizleme
         </button>
       </div>
@@ -281,6 +359,7 @@ watch(title, (value) => {
       <div ref="docShell" class="cv-workspace">
         <!-- Section navigation -->
         <nav class="cv-nav cv-no-print" aria-label="CV bölümleri">
+          <div class="cv-nav-label">CV İÇERİĞİ</div>
           <div class="nav flex-column nav-pills">
             <button
               v-for="tab in SECTION_TABS"
@@ -305,15 +384,18 @@ watch(title, (value) => {
             :template="template"
             :templates="templateOptions"
             @update:template="template = $event"
+            @update:active-tab="activeTab = $event"
           />
         </section>
 
         <!-- Preview -->
         <section ref="previewCol" class="cv-preview-col" :class="{ 'cv-hide-sm': mobileView !== 'preview' }" aria-label="CV önizlemesi">
+          <div class="cv-preview-toolbar cv-no-print"><span><i class="bi bi-eye me-1"></i>Canlı önizleme <small>A4 · 210 × 297 mm</small></span><span class="cv-zoom-badge">{{ Math.round(zoom * 100) }}%</span></div>
           <CvPreview :content="content" :design="design" :template="template" :zoom="zoom" />
         </section>
       </div>
     </template>
+    <CvHistoryDrawer :open="historyOpen" :document-id="route.params.id" :current-version="builder.version.value" @close="historyOpen = false" @restored="historyOpen = false; builder.reloadLatest()" />
   </div>
 </template>
 
@@ -323,50 +405,68 @@ watch(title, (value) => {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #e2e8f0;
+  background: #edf0f5;
   overflow: hidden;
 }
 .cv-state { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .cv-topbar {
-  height: 60px;
+  min-height: 64px;
   flex-shrink: 0;
-  background: #0f172a;
-  color: #fff;
+  background: rgba(255,255,255,.97);
+  color: #1d2939;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0 1rem;
-  border-bottom: 1px solid #1e293b;
+  padding: .55rem 1rem;
+  border-bottom: 1px solid #e2e7ef;
+  box-shadow: 0 1px 5px rgba(24,33,54,.035);
+  z-index: 3;
 }
-.cv-title-input { background: #1e293b; color: #fff; border-color: #334155; max-width: 360px; min-width: 120px; }
-.cv-title-input::placeholder { color: #94a3b8; }
-.cv-title-input:focus { background: #1e293b; color: #fff; }
-.cv-save-wrap :deep(.save-status) { color: #cbd5e1; }
+.cv-title-input { background: #f8f9fc; color: #1d2939; border-color: transparent; max-width: 360px; min-width: 120px; font-weight: 650; }
+.cv-title-input::placeholder { color: #98a2b3; }
+.cv-title-input:hover { background: #f1f3f8; }
+.cv-title-input:focus { background: #fff; color: #1d2939; border-color: #a5a0ee; }
+.cv-save-wrap :deep(.save-status) { color: #667085; font-size: .72rem; }
 .cv-save-bar { padding: 0.35rem 1rem; background: #fff; border-bottom: 1px solid #e2e8f0; }
+.cv-actionbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .4rem .75rem; border-bottom: 1px solid #e2e7ef; background: #fafbfc; }
+.cv-action-group { display: flex; align-items: center; gap: .3rem; }
+.cv-action-group .btn { display: inline-flex; align-items: center; gap: .35rem; min-height: 31px; padding: .3rem .55rem; font-size: .66rem; }
+.cv-action-group .btn-light { color: #596579; border-color: transparent; }
+.cv-action-group .btn-light:hover:not(:disabled) { color: #4038c7; background: #efeeff; }
+.cv-action-divider { width: 1px; height: 20px; margin: 0 .2rem; background: #dfe4eb; }
 .cv-mobile-switch { display: flex; margin: 0.5rem auto; width: max-content; }
 .cv-workspace { flex: 1; display: flex; min-height: 0; }
 .cv-nav {
-  width: 220px;
+  width: 196px;
   flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #e2e8f0;
+  padding: 1rem .65rem;
+  background: #fafbfc;
+  border-right: 1px solid #e2e7ef;
   overflow-y: auto;
 }
+.cv-nav-label { padding: .1rem .7rem .75rem; color: #98a2b3; font-size: .58rem; font-weight: 800; letter-spacing: .12em; }
 .cv-nav :deep(.nav-link) {
-  color: #475569;
-  border-radius: 0;
-  padding: 0.85rem 1.25rem;
-  border-left: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  color: #596579;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  padding: .66rem .7rem;
+  border-left: 0;
   text-align: left;
-  font-weight: 500;
+  font-size: .75rem;
+  font-weight: 600;
   white-space: nowrap;
   width: 100%;
 }
-.cv-nav :deep(.nav-link:hover) { background: #f1f5f9; }
-.cv-nav :deep(.nav-link.active) { background: #eff6ff; color: #2563eb; border-left-color: #2563eb; }
+.cv-nav :deep(.nav-link i) { width: 18px; color: #8792a5; text-align: center; }
+.cv-nav :deep(.nav-link:hover) { background: #f0f2f7; color: #29354a; }
+.cv-nav :deep(.nav-link.active) { background: #eeedff; color: #4f46e5; border-left: 0; }
+.cv-nav :deep(.nav-link.active i) { color: #4f46e5; }
+.cv-nav :deep(.nav-link.mt-2) { margin-top: .85rem !important; padding-top: .85rem !important; border-color: #e7eaf0 !important; }
 .cv-form-col {
-  width: 380px;
+  width: 404px;
   flex-shrink: 0;
   background: #fff;
   border-right: 1px solid #e2e8f0;
@@ -375,13 +475,20 @@ watch(title, (value) => {
 .cv-preview-col {
   flex: 1 1 auto;
   min-width: 0;
-  background: #525659;
+  background-color: #e9edf3;
+  background-image: radial-gradient(#c9d0dc .65px, transparent .65px);
+  background-size: 18px 18px;
   overflow: auto;
-  padding: 2rem 1.5rem;
+  padding: 0 1.5rem 2rem;
 }
-.cv-preview-col :deep(.cv-document) { margin-left: auto; margin-right: auto; }
+.cv-preview-toolbar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; margin: 0 -1.5rem 1.5rem; padding: .65rem 1.25rem; color: #596579; border-bottom: 1px solid rgba(210,216,226,.85); background: rgba(244,246,249,.92); backdrop-filter: blur(10px); font-size: .7rem; font-weight: 650; }
+.cv-preview-toolbar small { margin-left: .6rem; color: #98a2b3; font-size: .6rem; font-weight: 500; }
+.cv-zoom-badge { padding: .2rem .45rem; color: #667085; border: 1px solid #d8dde6; border-radius: 5px; background: rgba(255,255,255,.7); font-size: .62rem; }
+.cv-preview-col :deep(.cv-document) { margin-left: auto; margin-right: auto; box-shadow: 0 12px 35px rgba(33,42,62,.16); }
 
 @media (max-width: 991.98px) {
+  .cv-actionbar { overflow-x: auto; }
+  .cv-action-group { flex-shrink: 0; }
   .cv-workspace { flex-direction: column; }
   .cv-nav {
     width: 100%;
@@ -396,7 +503,16 @@ watch(title, (value) => {
   .cv-nav :deep(.nav-link.active) { border-left: 0; border-bottom-color: #2563eb; }
   .cv-nav :deep(.nav-link.mt-2) { margin-top: 0 !important; border-top: 0 !important; padding-top: 0.65rem !important; }
   .cv-form-col, .cv-preview-col { flex: 1 1 auto; width: 100%; min-height: 0; border-right: 0; }
-  .cv-preview-col { padding: 1rem 0.5rem; }
+  .cv-preview-col { padding: 0 .5rem 1rem; }
+  .cv-preview-toolbar { margin: 0 -.5rem 1rem; }
+  .cv-nav-label { display: none; }
   .cv-hide-sm { display: none !important; }
+}
+@media (max-width: 767.98px) {
+  .cv-topbar { flex-wrap: wrap; gap: .45rem; }
+  .cv-topbar > div { width: 100%; }
+  .cv-topbar > div:last-child { justify-content: flex-end; }
+  .cv-title-input { max-width: none; }
+  .cv-preview-toolbar small { display: none; }
 }
 </style>

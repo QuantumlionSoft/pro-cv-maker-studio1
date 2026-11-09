@@ -16,7 +16,7 @@ export const useUiStore = defineStore('ui', {
       this.toasts = this.toasts.filter((t) => t.id !== id)
     },
     /** Resolves true when confirmed, false when cancelled. */
-    confirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', danger = true }) {
+    confirm({ title, message, confirmText = 'Onayla', cancelText = 'Vazgeç', danger = true }) {
       return new Promise((resolve) => {
         if (this.confirmRequest) this.confirmRequest.resolve(false)
         this.confirmRequest = { title, message, confirmText, cancelText, danger, resolve }

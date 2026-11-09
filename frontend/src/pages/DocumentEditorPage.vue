@@ -189,8 +189,8 @@ async function saveNow() {
             <div class="card-body small text-secondary">
               <strong class="d-block text-body mb-1">The full {{ noun }} editor is still being built.</strong>
               {{ isCv
-                ? 'The three-panel CV editor with a live A4 preview, sections, design controls and PDF export arrives in Phase 2.'
-                : 'The block-based portfolio builder and website preview arrive in Phase 4.' }}
+                ? 'The full CV editor is available from the CV workspace with live A4 preview and PDF export.'
+                : 'The block-based portfolio builder and website preview are under active development.' }}
               Your name and template are already saved and will carry over.
             </div>
           </section>

@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.media.models import MediaAsset
 
-from .models import CVDocument
+from .models import CVDocument, CVRevision
 from .registry import CV_AVAILABLE_TEMPLATE_IDS
 from .schema import normalize_content, normalize_design
 
@@ -12,8 +12,8 @@ from apps.common.viewsets import OwnedDocumentViewSet  # noqa: F401  (keeps impo
 class CVDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = CVDocument
-        fields = ["id", "title", "slug", "template", "design", "content", "version", "created_at", "updated_at"]
-        read_only_fields = ["id", "slug", "version", "created_at", "updated_at"]
+        fields = ["id", "title", "slug", "template", "design", "content", "version", "created_at", "updated_at", "deleted_at"]
+        read_only_fields = ["id", "slug", "version", "created_at", "updated_at", "deleted_at"]
 
     def validate_title(self, value):
         value = value.strip()
@@ -36,3 +36,10 @@ class CVDocumentSerializer(serializers.ModelSerializer):
             return MediaAsset.objects.filter(owner=user, id=media_id).exists()
 
         return normalize_content(value, owned)
+
+
+class CVRevisionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CVRevision
+        fields = ["id", "version", "title", "template", "created_at"]
+        read_only_fields = fields

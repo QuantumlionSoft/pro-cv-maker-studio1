@@ -35,30 +35,30 @@ async function submit() {
 <template>
   <div class="auth-card card">
     <div class="card-body p-4 p-md-5">
-      <h1 class="h4 mb-1">Choose a new password</h1>
+      <h1 class="h4 mb-1">Yeni şifrenizi belirleyin</h1>
       <template v-if="done">
-        <div class="alert alert-success mt-3" role="status">Your password has been reset.</div>
-        <RouterLink :to="{ name: 'login' }" class="btn btn-primary w-100">Sign in</RouterLink>
+        <div class="alert alert-success mt-3" role="status">Şifreniz başarıyla yenilendi.</div>
+        <RouterLink :to="{ name: 'login' }" class="btn btn-primary w-100">Giriş yap</RouterLink>
       </template>
       <template v-else-if="!uid || !token">
-        <div class="alert alert-warning mt-3" role="alert">This link is incomplete. Request a new reset link.</div>
-        <RouterLink :to="{ name: 'forgot-password' }" class="btn btn-outline-primary w-100">Request a new link</RouterLink>
+        <div class="alert alert-warning mt-3" role="alert">Bu bağlantı eksik veya geçersiz. Yeni bir sıfırlama bağlantısı isteyin.</div>
+        <RouterLink :to="{ name: 'forgot-password' }" class="btn btn-outline-primary w-100">Yeni bağlantı iste</RouterLink>
       </template>
       <template v-else>
-        <p class="text-secondary mb-4">At least 10 characters. Avoid common passwords.</p>
+        <p class="text-secondary mb-4">En az 10 karakter kullanın ve yaygın şifrelerden kaçının.</p>
         <div v-if="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
         <form novalidate @submit.prevent="submit">
           <div class="mb-3">
-            <label class="form-label" for="reset-password">New password</label>
+            <label class="form-label" for="reset-password">Yeni şifre</label>
             <input id="reset-password" v-model="password" type="password" class="form-control" autocomplete="new-password" required :class="{ 'is-invalid': fieldError(fields, 'new_password') }" />
             <div v-if="fieldError(fields, 'new_password')" class="invalid-feedback">{{ fieldError(fields, 'new_password') }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label" for="reset-confirm">Confirm new password</label>
+            <label class="form-label" for="reset-confirm">Yeni şifre tekrarı</label>
             <input id="reset-confirm" v-model="confirm" type="password" class="form-control" autocomplete="new-password" required :class="{ 'is-invalid': fieldError(fields, 'new_password_confirm') }" />
             <div v-if="fieldError(fields, 'new_password_confirm')" class="invalid-feedback">{{ fieldError(fields, 'new_password_confirm') }}</div>
           </div>
-          <button type="submit" class="btn btn-primary w-100" :disabled="submitting">Set new password</button>
+          <button type="submit" class="btn btn-primary w-100" :disabled="submitting">Yeni şifreyi kaydet</button>
         </form>
       </template>
     </div>
