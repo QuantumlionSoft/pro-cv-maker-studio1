@@ -66,10 +66,12 @@ describe('parseImport (own format and errors)', () => {
     const exported = {
       format: 'pro-cv-maker-studio',
       content: { schemaVersion: 1, personal: { firstName: 'Ada', lastName: 'L', photoId: 9 }, summary: 's', experience: [], education: [], skills: [], languages: [], technologies: [], projects: [], certifications: [], references: [] },
+      template: 'elegant',
       design: { colorAccent: '#123456' },
     }
-    const { content, design, warnings } = parseImport(JSON.stringify(exported))
+    const { content, design, template, warnings } = parseImport(JSON.stringify(exported))
     expect(content.personal.photoId).toBeNull()
+    expect(template).toBe('elegant')
     expect(design.colorAccent).toBe('#123456')
     expect(warnings.length).toBe(1)
   })
@@ -140,6 +142,38 @@ describe('useCvBuilder autosave', () => {
     expect(api.update.mock.calls[0][1]).toMatchObject({ title: 'New title', version: 1 })
     expect(b.status.value).toBe('saved')
     expect(b.lastSavedAt.value).toBeInstanceOf(Date)
+  })
+
+  it('applies imported content, design and template before autosaving', async () => {
+    const b = useCvBuilder({ id: 1, api, scheduleDelay: 800 })
+    await b.load()
+    const imported = parseImport(JSON.stringify({
+      template: 'developer',
+      content: doc().content,
+      design: { colorAccent: '#22c55e' },
+    }))
+    b.replaceFromImport(imported)
+    expect(b.template.value).toBe('developer')
+    expect(b.design.value.colorAccent).toBe('#22c55e')
+    await vi.advanceTimersByTimeAsync(900)
+    expect(api.update.mock.calls[0][1]).toMatchObject({ template: 'developer', design: { colorAccent: '#22c55e' } })
+  })
+
+  it('supports session undo and redo without disabling autosave', async () => {
+    const b = useCvBuilder({ id: 1, api, scheduleDelay: 800 })
+    await b.load()
+    b.title.value = 'First edit'
+    await vi.advanceTimersByTimeAsync(450)
+    b.title.value = 'Second edit'
+    await vi.advanceTimersByTimeAsync(450)
+    expect(b.canUndo.value).toBe(true)
+    b.undo()
+    expect(b.title.value).toBe('First edit')
+    expect(b.canRedo.value).toBe(true)
+    b.redo()
+    expect(b.title.value).toBe('Second edit')
+    await vi.advanceTimersByTimeAsync(900)
+    expect(api.update).toHaveBeenCalled()
   })
 
   it('pauses autosave on a conflict and never overwrites the server copy', async () => {

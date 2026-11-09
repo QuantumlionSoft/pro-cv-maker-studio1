@@ -53,7 +53,7 @@ def run(base, shots, pdf_path):
         page.fill("#reg-first", "Ada")
         page.fill("#reg-password", PASSWORD)
         page.fill("#reg-password-confirm", PASSWORD)
-        page.get_by_role("button", name="Create account").click()
+        page.get_by_role("button", name="Hesap oluştur").click()
         expect(page.locator(".page-title", has_text="Ada")).to_be_visible()
         cv_id = page.evaluate("""async () => {
             await fetch('/api/auth/csrf/', {credentials: 'same-origin'})

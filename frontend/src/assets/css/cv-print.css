@@ -44,10 +44,45 @@
   }
 
   .cv-document {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    height: auto !important;
     margin: 0 !important;
     box-shadow: none !important;
+    overflow: visible !important;
     zoom: 1 !important;
   }
+
+  /* Keep logical rows together while still allowing long sections to flow. */
+  .cv-header,
+  .cv-item,
+  .cv-edu,
+  .cv-bar-item,
+  .cv-item-split,
+  .cv-ref-grid > div,
+  .cv-qr-small,
+  .cv-photo-wrap {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .cv-heading {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+  .cv-block { break-inside: auto !important; }
+  .cv-extras-newpage {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+  .cv-body,
+  .cv-body-single,
+  .cv-main,
+  .cv-sidebar,
+  .cv-extras {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  .cv-link { text-decoration: none !important; }
 
   * {
     -webkit-print-color-adjust: exact !important;

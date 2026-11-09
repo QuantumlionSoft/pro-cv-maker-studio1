@@ -9,16 +9,16 @@ const routes = [
     component: () => import('@/layouts/AuthLayout.vue'),
     meta: { guestOnly: true },
     children: [
-      { path: 'login', name: 'login', component: () => import('@/pages/LoginPage.vue'), meta: { title: 'Sign in' } },
-      { path: 'register', name: 'register', component: () => import('@/pages/RegisterPage.vue'), meta: { title: 'Create account' } },
-      { path: 'forgot-password', name: 'forgot-password', component: () => import('@/pages/ForgotPasswordPage.vue'), meta: { title: 'Reset password' } },
-      { path: 'reset-password', name: 'reset-password', component: () => import('@/pages/ResetPasswordPage.vue'), meta: { title: 'Choose a new password' } },
+      { path: 'login', name: 'login', component: () => import('@/pages/LoginPage.vue'), meta: { title: 'Giriş yap' } },
+      { path: 'register', name: 'register', component: () => import('@/pages/RegisterPage.vue'), meta: { title: 'Hesap oluştur' } },
+      { path: 'forgot-password', name: 'forgot-password', component: () => import('@/pages/ForgotPasswordPage.vue'), meta: { title: 'Şifre sıfırla' } },
+      { path: 'reset-password', name: 'reset-password', component: () => import('@/pages/ResetPasswordPage.vue'), meta: { title: 'Yeni şifre belirle' } },
     ],
   },
 
   // The CV builder is a full-screen editor, so it sits outside AppLayout (still auth-protected).
   {
-    path: '/cvs/:id',
+    path: '/cvs/:id(\\d+)',
     name: 'cv-detail',
     component: () => import('@/pages/CvBuilderPage.vue'),
     meta: { requiresAuth: true, title: 'CV', kind: 'cv' },
@@ -29,37 +29,38 @@ const routes = [
     component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: 'dashboard', name: 'dashboard', component: () => import('@/pages/DashboardPage.vue'), meta: { title: 'Dashboard' } },
+      { path: 'dashboard', name: 'dashboard', component: () => import('@/pages/DashboardPage.vue'), meta: { title: 'Genel Bakış' } },
+      { path: 'cvs/trash', name: 'cv-trash', component: () => import('@/pages/CvTrashPage.vue'), meta: { title: 'CV Çöp Kutusu', kind: 'cv' } },
       {
         path: 'cvs',
         name: 'cvs',
         component: () => import('@/pages/DocumentListPage.vue'),
-        meta: { title: 'My CVs', kind: 'cv' },
+        meta: { title: 'CV’lerim', kind: 'cv' },
       },
       {
         path: 'portfolios',
         name: 'portfolios',
         component: () => import('@/pages/DocumentListPage.vue'),
-        meta: { title: 'My Portfolios', kind: 'portfolio' },
+        meta: { title: 'Portfolyolarım', kind: 'portfolio' },
       },
       {
         path: 'portfolios/:id',
         name: 'portfolio-detail',
         component: () => import('@/pages/DocumentEditorPage.vue'),
-        meta: { title: 'Portfolio', kind: 'portfolio' },
+        meta: { title: 'Portfolyo', kind: 'portfolio' },
       },
-      { path: 'templates', name: 'templates', component: () => import('@/pages/TemplatesPage.vue'), meta: { title: 'Templates' } },
-      { path: 'account', name: 'account', component: () => import('@/pages/AccountPage.vue'), meta: { title: 'Account Settings' } },
+      { path: 'templates', name: 'templates', component: () => import('@/pages/TemplatesPage.vue'), meta: { title: 'Şablon Galerisi' } },
+      { path: 'account', name: 'account', component: () => import('@/pages/AccountPage.vue'), meta: { title: 'Hesap Ayarları' } },
       {
         path: 'coming-soon/:feature',
         name: 'coming-soon',
         component: () => import('@/pages/PlannedPage.vue'),
-        meta: { title: 'Coming soon' },
+        meta: { title: 'Yakında' },
       },
     ],
   },
 
-  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/pages/NotFoundPage.vue'), meta: { title: 'Page not found' } },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/pages/NotFoundPage.vue'), meta: { title: 'Sayfa bulunamadı' } },
 ]
 
 const router = createRouter({

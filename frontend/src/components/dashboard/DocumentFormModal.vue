@@ -9,6 +9,7 @@ const props = defineProps({
   kind: { type: String, required: true },
   document: { type: Object, default: null },
   templates: { type: Array, default: () => [] },
+  initialTemplate: { type: String, default: '' },
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -22,8 +23,8 @@ const saving = ref(false)
 const isEdit = computed(() => Boolean(props.document))
 const api = computed(() => createDocumentApi(props.kind))
 const heading = computed(() => {
-  const label = props.kind === 'cv' ? 'CV' : 'portfolio'
-  return isEdit.value ? `Rename ${label}` : `New ${label}`
+  const label = props.kind === 'cv' ? 'CV' : 'portfolyo'
+  return isEdit.value ? `${label} adını düzenle` : `Yeni ${label} oluştur`
 })
 
 let savedDocument = null
@@ -64,7 +65,8 @@ watch(
 
 function reset() {
   title.value = props.document?.title ?? ''
-  template.value = props.document?.template ?? props.templates[0]?.id ?? ''
+  template.value = props.document?.template ?? props.initialTemplate ?? props.templates[0]?.id ?? ''
+  if (!props.document && !props.templates.some((item) => item.id === template.value)) template.value = props.templates[0]?.id ?? ''
   errors.value = {}
   formError.value = ''
 }
@@ -85,7 +87,7 @@ async function submit() {
     modal.hide()
   } catch (error) {
     errors.value = error.fields || {}
-    formError.value = error.message || 'Could not save. Please try again.'
+    formError.value = error.message || 'Kaydedilemedi. Lütfen tekrar deneyin.'
   } finally {
     saving.value = false
   }
@@ -98,12 +100,12 @@ async function submit() {
       <form class="modal-content" novalidate @submit.prevent="submit">
         <div class="modal-header">
           <h2 id="doc-form-title" class="modal-title h5">{{ heading }}</h2>
-          <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" aria-label="Kapat" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <div v-if="formError" class="alert alert-danger py-2" role="alert">{{ formError }}</div>
           <div class="mb-3">
-            <label for="doc-title" class="form-label">Name</label>
+            <label for="doc-title" class="form-label">Belge adı</label>
             <input
               id="doc-title"
               v-model="title"
@@ -111,7 +113,7 @@ async function submit() {
               maxlength="160"
               class="form-control"
               :class="{ 'is-invalid': fieldError(errors, 'title') }"
-              placeholder="e.g. Senior Backend Engineer 2026"
+              placeholder="Örn. Kıdemli Backend Geliştirici CV 2026"
               :aria-describedby="fieldError(errors, 'title') ? 'doc-title-error' : undefined"
               autofocus
             />
@@ -120,7 +122,7 @@ async function submit() {
             </div>
           </div>
           <div v-if="!isEdit">
-            <label for="doc-template" class="form-label">Starting template</label>
+            <label for="doc-template" class="form-label">Başlangıç şablonu</label>
             <select id="doc-template" v-model="template" class="form-select" :class="{ 'is-invalid': fieldError(errors, 'template') }">
               <option v-for="item in templates" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
@@ -129,10 +131,10 @@ async function submit() {
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" :disabled="saving">Cancel</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" :disabled="saving">Vazgeç</button>
           <button type="submit" class="btn btn-primary" :disabled="saving">
             <span v-if="saving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            {{ isEdit ? 'Save name' : 'Create' }}
+            {{ isEdit ? 'Adı kaydet' : 'Oluştur' }}
           </button>
         </div>
       </form>

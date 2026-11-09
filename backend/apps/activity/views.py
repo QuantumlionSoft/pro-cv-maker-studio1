@@ -19,7 +19,7 @@ class DashboardView(APIView):
 
     def get(self, request):
         user = request.user
-        cvs = CVDocument.objects.filter(owner=user)
+        cvs = CVDocument.objects.filter(owner=user, deleted_at__isnull=True)
         portfolios = PortfolioDocument.objects.filter(owner=user)
 
         recent = []

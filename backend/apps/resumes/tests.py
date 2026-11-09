@@ -76,9 +76,14 @@ class CVDocumentApiTests(APITestCase):
         self.assertEqual(stale.status_code, 409)
         self.assertEqual(CVDocument.objects.get(pk=cv["id"]).title, "First")
 
-    def test_unavailable_or_unknown_template_rejected(self):
+    def test_unknown_template_rejected(self):
         self.assertIn("template", self.client.post("/api/cvs/", {"title": "X", "template": "nope"}, format="json").json()["error"]["fields"])
-        self.assertIn("template", self.client.post("/api/cvs/", {"title": "X", "template": "executive"}, format="json").json()["error"]["fields"])
+
+    def test_every_catalogue_template_can_be_used(self):
+        catalogue = self.client.get("/api/cv-templates/").json()
+        for item in catalogue:
+            response = self.client.post("/api/cvs/", {"title": item["name"], "template": item["id"]}, format="json")
+            self.assertEqual(response.status_code, 201, response.data)
 
     def test_unsafe_urls_and_bad_emails_are_rejected(self):
         cv = self.create_cv()
@@ -139,11 +144,50 @@ class CVDocumentApiTests(APITestCase):
     def test_template_catalogue_has_ten_entries_with_availability(self):
         catalogue = self.client.get("/api/cv-templates/").json()
         self.assertEqual(len(catalogue), 10)
-        self.assertEqual(sum(1 for t in catalogue if t["available"]), 3)
+        self.assertEqual(sum(1 for t in catalogue if t["available"]), 10)
 
     def test_schema_normalises_prototype_style_empty_input(self):
         clean = normalize_content(None, lambda _: False)
         self.assertEqual(clean, empty_content())
+
+    def test_revision_history_and_restore(self):
+        cv = self.create_cv("First title")
+        self.client.patch(f"/api/cvs/{cv['id']}/", {"title": "Second title", "version": 1}, format="json")
+        revisions = self.client.get(f"/api/cvs/{cv['id']}/revisions/").json()
+        self.assertEqual([item["version"] for item in revisions], [2, 1])
+        first = next(item for item in revisions if item["version"] == 1)
+        restored = self.client.post(f"/api/cvs/{cv['id']}/restore-revision/", {"revision_id": first["id"]}, format="json")
+        self.assertEqual(restored.status_code, 200, restored.data)
+        self.assertEqual(restored.json()["title"], "First title")
+        self.assertEqual(restored.json()["version"], 3)
+        self.assertEqual(self.client.get(f"/api/cvs/{cv['id']}/revisions/").json()[0]["version"], 3)
+
+    def test_soft_delete_trash_restore_and_permanent_delete(self):
+        cv = self.create_cv("Trash me")
+        self.assertEqual(self.client.delete(f"/api/cvs/{cv['id']}/").status_code, 204)
+        self.assertEqual(self.client.get(f"/api/cvs/{cv['id']}/").status_code, 404)
+        trash = self.client.get("/api/cvs/trash/").json()
+        self.assertEqual([item["id"] for item in trash], [cv["id"]])
+        restored = self.client.post(f"/api/cvs/{cv['id']}/restore/")
+        self.assertEqual(restored.status_code, 200)
+        self.assertIsNone(restored.json()["deleted_at"])
+        self.client.delete(f"/api/cvs/{cv['id']}/")
+        self.assertEqual(self.client.delete(f"/api/cvs/{cv['id']}/permanent/").status_code, 204)
+        self.assertFalse(CVDocument.objects.filter(pk=cv["id"]).exists())
+
+    def test_section_layout_is_normalised(self):
+        cv = self.create_cv()
+        content = cv["content"]
+        content["sectionOrder"] = ["projects", "experience", "projects", "invalid"]
+        content["hiddenSections"] = ["references", "invalid"]
+        content["sectionTitles"] = {"projects": " Seçili Projeler ", "invalid": "x"}
+        response = self.client.patch(f"/api/cvs/{cv['id']}/", {"content": content, "version": 1}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        clean = response.json()["content"]
+        self.assertEqual(clean["sectionOrder"][:2], ["projects", "experience"])
+        self.assertEqual(len(clean["sectionOrder"]), 9)
+        self.assertEqual(clean["hiddenSections"], ["references"])
+        self.assertEqual(clean["sectionTitles"], {"projects": "Seçili Projeler"})
 
 
 class EducationGpaTests(APITestCase):

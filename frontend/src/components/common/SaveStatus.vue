@@ -12,15 +12,15 @@ defineEmits(['retry'])
 const view = computed(() => {
   switch (props.status) {
     case 'saving':
-      return { icon: 'bi-arrow-repeat spin', text: 'Saving…', variant: 'text-secondary' }
+      return { icon: 'bi-arrow-repeat spin', text: 'Kaydediliyor…', variant: 'text-secondary' }
     case 'dirty':
-      return { icon: 'bi-pencil', text: 'Unsaved changes — saving automatically', variant: 'text-warning-emphasis' }
+      return { icon: 'bi-pencil', text: 'Kaydedilmemiş değişiklikler · otomatik kaydedilecek', variant: 'text-warning-emphasis' }
     case 'saved':
-      return { icon: 'bi-check-circle', text: `All changes saved${props.lastSavedAt ? ' · ' + formatDateTime(props.lastSavedAt) : ''}`, variant: 'text-success' }
+      return { icon: 'bi-check-circle', text: `Tüm değişiklikler kaydedildi${props.lastSavedAt ? ' · ' + formatDateTime(props.lastSavedAt) : ''}`, variant: 'text-success' }
     case 'error':
-      return { icon: 'bi-exclamation-triangle', text: props.error || 'Save failed.', variant: 'text-danger' }
+      return { icon: 'bi-exclamation-triangle', text: props.error || 'Kaydetme başarısız.', variant: 'text-danger' }
     case 'conflict':
-      return { icon: 'bi-exclamation-octagon', text: 'Changed elsewhere — not saved.', variant: 'text-danger' }
+      return { icon: 'bi-exclamation-octagon', text: 'Başka bir yerde değiştirildi · kaydedilmedi.', variant: 'text-danger' }
     default:
       return { icon: 'bi-cloud', text: '', variant: 'text-secondary' }
   }
@@ -33,7 +33,7 @@ const view = computed(() => {
       <i :class="['bi', view.icon]" aria-hidden="true"></i>{{ view.text }}
     </span>
     <button v-if="status === 'error'" type="button" class="btn btn-sm btn-outline-danger ms-2" @click="$emit('retry')">
-      Retry save
+      Tekrar kaydet
     </button>
   </div>
 </template>

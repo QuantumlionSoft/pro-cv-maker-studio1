@@ -21,7 +21,7 @@ async function submit() {
   fields.value = {}
   try {
     await auth.register({ ...form.value, username: form.value.username.trim(), email: form.value.email.trim() })
-    ui.toast('Account created. Welcome!', 'success')
+    ui.toast('Hesabınız oluşturuldu. Hoş geldiniz!', 'success')
     const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') ? route.query.next : '/dashboard'
     router.push(next)
   } catch (error) {
@@ -36,40 +36,40 @@ async function submit() {
 <template>
   <div class="auth-card card">
     <div class="card-body p-4 p-md-5">
-      <h1 class="h4 mb-1">Create your account</h1>
-      <p class="text-secondary mb-4">Your documents are private to your account.</p>
+      <h1 class="h4 mb-1">Hesabınızı oluşturun</h1>
+      <p class="text-secondary mb-4">Belgeleriniz yalnızca hesabınıza özeldir.</p>
 
       <div v-if="errorMessage" class="alert alert-danger" role="alert">{{ errorMessage }}</div>
 
       <form novalidate @submit.prevent="submit">
         <div class="row g-3">
           <div class="col-sm-6">
-            <label class="form-label" for="reg-first">First name</label>
+            <label class="form-label" for="reg-first">Ad</label>
             <input id="reg-first" v-model="form.first_name" class="form-control" autocomplete="given-name" />
           </div>
           <div class="col-sm-6">
-            <label class="form-label" for="reg-last">Last name</label>
+            <label class="form-label" for="reg-last">Soyad</label>
             <input id="reg-last" v-model="form.last_name" class="form-control" autocomplete="family-name" />
           </div>
           <div class="col-12">
-            <label class="form-label" for="reg-username">Username</label>
+            <label class="form-label" for="reg-username">Kullanıcı adı</label>
             <input id="reg-username" v-model="form.username" class="form-control" autocomplete="username" required :class="{ 'is-invalid': fieldError(fields, 'username') }" aria-describedby="reg-username-help" />
-            <div id="reg-username-help" class="form-text">Letters, numbers, dots, dashes or underscores. At least 3 characters.</div>
+            <div id="reg-username-help" class="form-text">Harf, rakam, nokta, tire veya alt çizgi. En az 3 karakter.</div>
             <div v-if="fieldError(fields, 'username')" class="invalid-feedback d-block">{{ fieldError(fields, 'username') }}</div>
           </div>
           <div class="col-12">
-            <label class="form-label" for="reg-email">Email</label>
+            <label class="form-label" for="reg-email">E-posta</label>
             <input id="reg-email" v-model="form.email" type="email" class="form-control" autocomplete="email" required :class="{ 'is-invalid': fieldError(fields, 'email') }" />
             <div v-if="fieldError(fields, 'email')" class="invalid-feedback">{{ fieldError(fields, 'email') }}</div>
           </div>
           <div class="col-12">
-            <label class="form-label" for="reg-password">Password</label>
+            <label class="form-label" for="reg-password">Şifre</label>
             <input id="reg-password" v-model="form.password" type="password" class="form-control" autocomplete="new-password" required :class="{ 'is-invalid': fieldError(fields, 'password') }" aria-describedby="reg-password-help" />
-            <div id="reg-password-help" class="form-text">At least 10 characters. Avoid common passwords.</div>
+            <div id="reg-password-help" class="form-text">En az 10 karakter. Yaygın şifrelerden kaçının.</div>
             <div v-if="fieldError(fields, 'password')" class="invalid-feedback d-block">{{ fieldError(fields, 'password') }}</div>
           </div>
           <div class="col-12">
-            <label class="form-label" for="reg-password-confirm">Confirm password</label>
+            <label class="form-label" for="reg-password-confirm">Şifre tekrarı</label>
             <input id="reg-password-confirm" v-model="form.password_confirm" type="password" class="form-control" autocomplete="new-password" required :class="{ 'is-invalid': fieldError(fields, 'password_confirm') }" />
             <div v-if="fieldError(fields, 'password_confirm')" class="invalid-feedback">{{ fieldError(fields, 'password_confirm') }}</div>
           </div>
@@ -81,7 +81,7 @@ async function submit() {
       </form>
 
       <p class="text-center small mt-4 mb-0">
-        Already have an account? <RouterLink :to="{ name: 'login' }">Sign in</RouterLink>
+        Zaten hesabınız var mı? <RouterLink :to="{ name: 'login' }">Giriş yapın</RouterLink>
       </p>
     </div>
   </div>
