@@ -336,9 +336,8 @@ const sectionTitle = (key) => props.content.sectionTitles?.[key]?.trim() || DEFA
         <div class="cv-ref-grid">
           <div v-for="ref in content.references" :key="ref.id">
             <h6 class="fw-bold mb-1" :style="itemTitleStyle">{{ ref.name }}</h6>
-            <div class="cv-muted">
-              {{ ref.position }}<span v-if="ref.company"> @ {{ ref.company }}</span>
-            </div>
+            <div v-if="ref.position" class="cv-muted">{{ ref.position }}</div>
+            <div v-if="ref.company" class="cv-muted cv-ref-company">{{ ref.company }}</div>
             <div class="cv-small">
               <div v-if="ref.email"><i class="bi bi-envelope-fill"></i> {{ ref.email }}</div>
               <div v-if="ref.phone"><i class="bi bi-telephone-fill"></i> {{ ref.phone }}</div>

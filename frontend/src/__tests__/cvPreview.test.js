@@ -44,6 +44,17 @@ describe('CvPreview template renderers', () => {
     expect(wrapper.find('[data-section="education"]').attributes('style')).toContain('order: 0')
   })
 
+  it('displays the reference company on its own line without an at sign', () => {
+    const custom = structuredClone(content)
+    custom.references = [{ id: 'r1', name: 'Ayşe Yılmaz', position: 'Proje Yöneticisi', company: 'Örnek Teknoloji', email: '', phone: '' }]
+    const wrapper = mount(CvPreview, { props: { content: custom, design: DESIGN_DEFAULTS, template: 'professional' } })
+    const reference = wrapper.find('[data-section="references"]')
+    expect(reference.text()).toContain('Proje Yöneticisi')
+    expect(reference.text()).toContain('Örnek Teknoloji')
+    expect(reference.text()).not.toContain('@')
+    expect(reference.find('.cv-ref-company').text()).toBe('Örnek Teknoloji')
+  })
+
   it('always labels a current role as Halen even when an old end date remains', () => {
     const stale = structuredClone(content)
     stale.experience[0].end = '2024'
